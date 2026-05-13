@@ -1,0 +1,31 @@
+# Local dev + scripts dependencies.
+#
+# Install once per machine after cloning:
+#     pip install -r requirements.txt
+#
+# This is separate from function_app/requirements.txt, which is what
+# Azure installs inside the Function App runtime. Local scripts (preanalyze,
+# deploy_search, diagnose, check_index, smoke_test) run on YOUR machine
+# and need these packages in your venv.
+#
+# preanalyze.py imports from function_app/shared/, which uses PyMuPDF for
+# PDF cropping and httpx/azure-identity for Azure calls.
+
+httpx>=0.27.0,<1.0.0
+azure-identity>=1.17.0,<2.0.0
+PyMuPDF>=1.24.0,<2.0.0
+# Pillow: needed by shared/diagram.py:_image_phash (perceptual-hash
+# dedup added in Sprint 5). Imports as `PIL`. On some platforms
+# PyMuPDF used to vendor it; modern PyMuPDF wheels do NOT, so declare
+# it explicitly to avoid an ImportError on phash compute.
+Pillow>=10.0.0,<12.99.0
+# openai: preanalyze.py calls vision directly for batch processing,
+# AND the unit-test suite transitively imports shared/aoai.py via
+# diagram.py -> normalize_figure_ref. Function App runtime has its
+# own copy in function_app/requirements.txt; this declaration is
+# specifically for the local script + test environment.
+openai>=1.40.0,<2.0.0
+# azure-cosmos is optional but recommended -- enables run_history +
+# pdf_state writes for the Power BI dashboard. Without it, the
+# cosmos_writer module silently no-ops (preanalyze still works).
+azure-cosmos>=4.5.0,<5.0.0

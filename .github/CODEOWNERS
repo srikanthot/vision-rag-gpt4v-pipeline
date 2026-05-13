@@ -1,0 +1,20 @@
+# Code owners for required review on PRs.
+#
+# IMPORTANT BEFORE HANDOFF: replace the @your-org/<team> placeholders with
+# the actual GitHub team handles for the operations team. PRs will fail
+# their required-reviewer check until these resolve to a real team.
+
+# Global fallback
+*                       @your-org/indexing-pipeline-owners
+
+# Deploy + CI require extra scrutiny (changes here can break production)
+/scripts/               @your-org/indexing-pipeline-owners @your-org/devops
+/.github/               @your-org/devops
+/Jenkinsfile.deploy     @your-org/devops
+/Jenkinsfile.run        @your-org/devops
+
+# Search schema changes affect the live index
+/search/                @your-org/indexing-pipeline-owners
+
+# Function app code is the runtime path for every indexer call
+/function_app/          @your-org/indexing-pipeline-owners

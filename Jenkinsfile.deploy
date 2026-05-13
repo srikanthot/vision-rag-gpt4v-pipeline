@@ -1,0 +1,160 @@
+/*
+ * Jenkinsfile.deploy - one-time / on-push deployment of:
+ *   - Function App code (deploy_function.sh)
+ *   - Search artifacts (deploy_search.py)
+ *   - Smoke test gate
+ *
+ * Triggered by: git push to main, with a manual approval before each
+ * environment promotion.
+ *
+ * Required Jenkins agent setup:
+ *   - Linux agent (Ubuntu 22.04 recommended) with python3.11+, az CLI,
+ *     and either System-Assigned Managed Identity OR a Service Principal
+ *     in env (AZURE_CLIENT_ID / AZURE_TENANT_ID / AZURE_CLIENT_SECRET).
+ *   - The agent identity must hold these roles in the target subscription:
+ *       Storage Blob Data Contributor    on the storage account
+ *       Search Service Contributor       on the search service
+ *       Search Index Data Contributor    on the search service
+ *       Cognitive Services User          on AOAI + DI accounts
+ *       Contributor                      on the Function App resource group
+ *       Cosmos DB Built-in Data Contributor  on the cosmos account
+ *
+ * Required Jenkins credential bindings (file credentials):
+ *   - deploy-config-dev   -> deploy.config.json for dev environment
+ *   - deploy-config-prod  -> deploy.config.json for prod environment
+ */
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'prod'],
+            description: 'Target environment'
+        )
+        booleanParam(
+            name: 'SKIP_SMOKE',
+            defaultValue: false,
+            description: 'Skip post-deploy smoke test (only for emergency rollouts)'
+        )
+    }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        timeout(time: 60, unit: 'MINUTES')
+    }
+
+    environment {
+        // Azure cloud. Don't change without auditing every
+        // script's hardcoded scopes.
+        AZURE_CLOUD = 'AzureCloud'
+        PYTHONUNBUFFERED = '1'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+                sh 'git rev-parse --short HEAD > .git_sha'
+            }
+        }
+
+        stage('Bootstrap') {
+            steps {
+                sh '''
+                    set -e
+                    python3 -m venv .venv
+                    . .venv/bin/activate
+                    pip install --quiet -r requirements.txt
+                    az cloud set --name "$AZURE_CLOUD"
+                    az login --identity --output none || true
+                '''
+            }
+        }
+
+        stage('Tests') {
+            steps {
+                sh '''
+                    set -e
+                    . .venv/bin/activate
+                    python tests/test_unit.py
+                    python tests/test_filename_spaces.py
+                '''
+            }
+        }
+
+        stage('Lint') {
+            steps {
+                sh '''
+                    set -e
+                    . .venv/bin/activate
+                    pip install --quiet ruff
+                    ruff check function_app tests scripts
+                '''
+            }
+        }
+
+        stage('Load config') {
+            steps {
+                script {
+                    def credId = params.TARGET_ENV == 'prod' ? 'deploy-config-prod' : 'deploy-config-dev'
+                    withCredentials([file(credentialsId: credId, variable: 'CFG_FILE')]) {
+                        sh 'cp "$CFG_FILE" deploy.config.json'
+                    }
+                }
+            }
+        }
+
+        stage('Approve prod deploy') {
+            when { expression { params.TARGET_ENV == 'prod' } }
+            steps {
+                input(
+                    message: "Promote to PROD?",
+                    submitterParameter: 'APPROVER'
+                )
+            }
+        }
+
+        stage('Bootstrap environment') {
+            // Single-command end-to-end bootstrap. Auto-detects + handles:
+            //  - RBAC role assignments (function app MI, search MI, principal)
+            //  - Cosmos DB database creation if missing
+            //  - Search service authOptions: apiKeyOnly -> aadOrApiKey
+            //  - publicNetworkAccess: disabled -> enabled
+            //  - Function App + search artifacts deployment with retries
+            //  - Smoke test gate
+            //
+            // --auto-fix is set in the deploy pipeline because the agent
+            // identity is expected to have permission for these settings.
+            // For manual local runs, run without --auto-fix first to see
+            // what would be changed.
+            steps {
+                sh '''
+                    set -e
+                    . .venv/bin/activate
+                    python scripts/bootstrap.py \
+                        --config deploy.config.json \
+                        --auto-fix \
+                        --skip-deploy-principal
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Deploy to ${params.TARGET_ENV} succeeded."
+        }
+        failure {
+            echo "Deploy to ${params.TARGET_ENV} FAILED. Check stage logs."
+        }
+        cleanup {
+            // Don't leave the deploy.config.json file (which contains
+            // environment-specific identifiers) on the agent disk.
+            sh 'rm -f deploy.config.json || true'
+        }
+    }
+}

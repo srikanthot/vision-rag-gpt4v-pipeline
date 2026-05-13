@@ -1,0 +1,155 @@
+/*
+ * Jenkinsfile.run - operational pipeline. Runs nightly + on demand.
+ *
+ *   1. reconcile.py             detect added/edited/deleted PDFs
+ *   2. preanalyze.py --incremental
+ *   3. wait for indexer to settle
+ *   4. check_index.py --coverage --write-status
+ *   5. write run summary to Cosmos DB
+ *
+ * Trigger: nightly cron at 02:00 UTC + manual button.
+ *
+ * Same agent requirements as Jenkinsfile.deploy. The agent identity
+ * additionally needs:
+ *   Storage Blob Data Contributor (read + delete cache blobs)
+ *   Search Index Data Contributor (read + delete index records)
+ *   Cosmos DB Built-in Data Contributor (write run history + pdf_state)
+ */
+
+pipeline {
+    agent any
+
+    parameters {
+        choice(
+            name: 'TARGET_ENV',
+            choices: ['dev', 'prod'],
+            description: 'Target environment'
+        )
+        booleanParam(
+            name: 'SKIP_RECONCILE',
+            defaultValue: false,
+            description: 'Skip add/edit/delete detection (only do preanalyze + coverage)'
+        )
+        booleanParam(
+            name: 'SKIP_WAIT',
+            defaultValue: false,
+            description: 'Skip waiting for indexer; just report current state'
+        )
+        string(
+            name: 'MAX_PURGES',
+            defaultValue: '2',
+            description: 'Refuse to purge more than N PDFs in one run'
+        )
+        string(
+            name: 'MAX_WAIT_MINUTES',
+            defaultValue: '60',
+            description: 'How long to wait for the indexer to settle (minutes)'
+        )
+    }
+
+    triggers {
+        // Nightly at 02:00 UTC. Adjust to taste.
+        cron('0 2 * * *')
+    }
+
+    options {
+        timestamps()
+        ansiColor('xterm')
+        timeout(time: 4, unit: 'HOURS')   // big PDF preanalyze can take a while
+        disableConcurrentBuilds()         // only one run at a time per env
+    }
+
+    environment {
+        AZURE_CLOUD = 'AzureCloud'
+        PYTHONUNBUFFERED = '1'
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Bootstrap') {
+            steps {
+                sh '''
+                    set -e
+                    python3 -m venv .venv
+                    . .venv/bin/activate
+                    pip install --quiet -r requirements.txt
+                    pip install --quiet azure-cosmos>=4.5.0
+                    az cloud set --name "$AZURE_CLOUD"
+                    az login --identity --output none || true
+
+                    # LibreOffice is OPTIONAL but recommended -- enables
+                    # native figure extraction from DOCX/PPTX/XLSX. The
+                    # pipeline gracefully falls back if it's missing.
+                    if ! command -v libreoffice >/dev/null && ! command -v soffice >/dev/null; then
+                        echo "LibreOffice not found; attempting install..."
+                        if command -v apt-get >/dev/null; then
+                            sudo apt-get update -qq && sudo apt-get install -y -qq libreoffice || \
+                                echo "LibreOffice install failed (non-fatal); continuing"
+                        elif command -v dnf >/dev/null; then
+                            sudo dnf install -y libreoffice || \
+                                echo "LibreOffice install failed (non-fatal); continuing"
+                        else
+                            echo "no apt-get/dnf; install LibreOffice manually for figure extraction on DOCX/PPTX/XLSX"
+                        fi
+                    fi
+                '''
+            }
+        }
+
+        stage('Load config') {
+            steps {
+                script {
+                    def credId = params.TARGET_ENV == 'prod' ? 'deploy-config-prod' : 'deploy-config-dev'
+                    withCredentials([file(credentialsId: credId, variable: 'CFG_FILE')]) {
+                        sh 'cp "$CFG_FILE" deploy.config.json'
+                    }
+                }
+            }
+        }
+
+        stage('Run pipeline') {
+            steps {
+                script {
+                    def triggeredBy = currentBuild.getBuildCauses()
+                        .any { it._class.contains('TimerTrigger') } ? 'jenkins-cron' : 'jenkins-manual'
+
+                    def args = [
+                        '--config', 'deploy.config.json',
+                        '--max-purges', params.MAX_PURGES,
+                        '--max-wait-minutes', params.MAX_WAIT_MINUTES,
+                        '--triggered-by', triggeredBy,
+                    ]
+                    if (params.SKIP_RECONCILE) { args << '--skip-reconcile' }
+                    if (params.SKIP_WAIT)      { args << '--skip-wait' }
+
+                    sh """
+                        set -e
+                        . .venv/bin/activate
+                        python scripts/run_pipeline.py ${args.join(' ')}
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "Run completed for ${params.TARGET_ENV}. See Power BI dashboard for details."
+        }
+        unstable {
+            echo "Run completed with warnings -- check the logs."
+        }
+        failure {
+            echo "Run FAILED. Check stage logs and Cosmos DB indexing_run_history."
+        }
+        cleanup {
+            sh 'rm -f deploy.config.json || true'
+        }
+    }
+}

@@ -1,0 +1,13 @@
+azure-functions>=1.18.0,<2.0.0
+azure-identity>=1.17.0,<2.0.0
+azure-monitor-opentelemetry>=1.6.0,<2.0.0
+openai>=1.40.0,<2.0.0
+httpx>=0.27.0,<1.0.0
+pydantic>=2.6.0,<3.0.0
+PyMuPDF>=1.24.0,<2.0.0
+azure-search-documents>=11.5.0,<12.0.0
+# Pillow: needed by shared/diagram.py:_image_phash (perceptual-hash
+# dedup added in Sprint 5). Without this, the function-app vision
+# path crashes on every call when computing phash. Declare explicitly
+# so Azure installs it inside the runtime.
+Pillow>=10.0.0,<12.99.0

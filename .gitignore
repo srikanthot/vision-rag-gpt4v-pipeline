@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Test + tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+.coverage.*
+
+# Azure Functions
+.azurefunctions/
+bin/
+obj/
+local.settings.json
+.python_packages/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Secrets / per-environment config
+*.env
+.env
+*.key
+*.pem
+deploy.config.json
+
+# Backup / scratch
+*.bak
+*.tmp
+*~

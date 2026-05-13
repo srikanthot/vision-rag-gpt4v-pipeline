@@ -1,0 +1,19 @@
+{
+  "name": "<DATASOURCE_NAME>",
+  "description": "Blob source for multimodal manual indexing. Uses managed identity: the Search service's system-assigned identity has Storage Blob Data Reader on the account.",
+  "type": "azureblob",
+  "credentials": {
+    "connectionString": "ResourceId=<STORAGE_RESOURCE_ID>;"
+  },
+  "container": {
+    "name": "<STORAGE_CONTAINER_NAME>",
+    "query": ""
+  },
+  "dataChangeDetectionPolicy": {
+    "@odata.type": "#Microsoft.Azure.Search.HighWaterMarkChangeDetectionPolicy",
+    "highWaterMarkColumnName": "metadata_storage_last_modified"
+  },
+  "dataDeletionDetectionPolicy": {
+    "@odata.type": "#Microsoft.Azure.Search.NativeBlobSoftDeleteDeletionDetectionPolicy"
+  }
+}

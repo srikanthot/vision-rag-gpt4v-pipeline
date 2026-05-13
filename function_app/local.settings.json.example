@@ -1,0 +1,31 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "<AZURE_WEBJOBS_STORAGE_CONN>",
+    "FUNCTIONS_WORKER_RUNTIME": "python",
+
+    "AUTH_MODE": "mi",
+    "__comment_auth__": "Default is 'mi' (managed identity / Azure CLI chain). Set AUTH_MODE=key only if you must run without AAD access locally; production always uses 'mi'.",
+
+    "AOAI_ENDPOINT": "<AOAI_ENDPOINT>",
+    "AOAI_API_KEY": "",
+    "AOAI_API_VERSION": "2024-12-01-preview",
+    "AOAI_VISION_DEPLOYMENT": "<AOAI_VISION_DEPLOYMENT>",
+    "AOAI_CHAT_DEPLOYMENT": "<AOAI_CHAT_DEPLOYMENT>",
+
+    "DI_ENDPOINT": "<DI_ENDPOINT>",
+    "DI_API_KEY": "",
+    "DI_API_VERSION": "2024-11-30",
+
+    "SEARCH_ENDPOINT": "<SEARCH_ENDPOINT>",
+    "SEARCH_ADMIN_KEY": "",
+    "SEARCH_INDEX_NAME": "mm-manuals-index",
+
+    "__comment_storage__": "STORAGE_BLOB_SAS is a break-glass path only (AUTH_MODE=key). Production uses the Function App MI + Storage Blob Data Reader RBAC.",
+    "STORAGE_BLOB_SAS": "",
+
+    "APPLICATIONINSIGHTS_CONNECTION_STRING": "<APP_INSIGHTS_CONN_STR>",
+
+    "SKILL_VERSION": "1.0.0"
+  }
+}

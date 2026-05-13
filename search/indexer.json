@@ -1,0 +1,43 @@
+{
+  "name": "<INDEXER_NAME>",
+  "dataSourceName": "<DATASOURCE_NAME>",
+  "targetIndexName": "<INDEX_NAME>",
+  "skillsetName": "<SKILLSET_NAME>",
+  "schedule": {
+    "interval": "PT5M",
+    "startTime": "2020-01-01T00:00:00Z"
+  },
+  "parameters": {
+    "batchSize": 1,
+    "maxFailedItems": 1000,
+    "maxFailedItemsPerBatch": 1000,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "default",
+      "allowSkillsetToReadFileData": true,
+      "imageAction": "none",
+      "failOnUnsupportedContentType": false,
+      "failOnUnprocessableDocument": false,
+      "indexedFileNameExtensions": ".pdf,.docx,.pptx,.xlsx"
+    }
+  },
+  "fieldMappings": [
+    {
+      "sourceFieldName": "metadata_operationalarea",
+      "targetFieldName": "operationalarea"
+    },
+    {
+      "sourceFieldName": "metadata_functionalarea",
+      "targetFieldName": "functionalarea"
+    },
+    {
+      "sourceFieldName": "metadata_doctype",
+      "targetFieldName": "doctype"
+    },
+    {
+      "sourceFieldName": "metadata_storage_file_extension",
+      "targetFieldName": "filetype"
+    }
+  ],
+  "outputFieldMappings": []
+}
