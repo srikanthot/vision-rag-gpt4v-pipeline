@@ -1,4 +1,4 @@
-# Vision RAG Pipeline — GPT-4V Diagram Q# MANGOS Vision RAG — Ask Questions About DiagramsA
+# Vision RAG Pipeline — GPT-4V Diagram Q&A
 
 > Multimodal RAG that answers questions about **diagrams, schematics, charts, and tables** — not just body text. Figures are described by GPT‑4 Vision and made first-class, citable, retrievable records.
 
