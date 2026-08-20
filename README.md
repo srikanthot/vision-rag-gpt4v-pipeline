@@ -34,3 +34,20 @@ python scripts/run_pipeline.py
 ```
 
 ---
+
+## Figure-type classifier (PyTorch)
+
+Not every extracted figure deserves a GPT-4 Vision call. An optional local
+classifier ([`function_app/shared/figure_classifier.py`](function_app/shared/figure_classifier.py))
+embeds each cropped figure with a **torchvision ResNet-18** backbone and
+routes it by type:
+
+| Figure type | Route |
+|---|---|
+| diagram / chart / table | GPT-4 Vision description + OCR (full treatment) |
+| photo / decorative | thumbnail metadata only — Vision call skipped |
+
+Nearest-centroid over class embeddings keeps it transparent and retrainable
+from a small labeled seed set (`build_centroids`). Falls back to a
+luminance-histogram heuristic when torch isn't installed, so the pipeline
+never hard-fails on an optional dependency.

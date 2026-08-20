@@ -29,3 +29,11 @@ openai>=1.40.0,<2.0.0
 # pdf_state writes for the Power BI dashboard. Without it, the
 # cosmos_writer module silently no-ops (preanalyze still works).
 azure-cosmos>=4.5.0,<5.0.0
+
+# --- Optional: local figure-type classifier (shared/figure_classifier.py) ---
+# Routes cropped figures (diagram/chart/table vs photo) BEFORE GPT-4 Vision,
+# cutting vision-API spend on photos/decorative images. CPU wheels are fine.
+# Used only in the local pre-analyze path; the Azure Function runtime does
+# not need these (classifier degrades to a histogram heuristic without them).
+torch>=2.2.0,<3.0.0
+torchvision>=0.17.0,<1.0.0
